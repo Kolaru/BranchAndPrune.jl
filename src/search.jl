@@ -1,28 +1,28 @@
 """
-    BPSearch{DATA}
+    AbstractSearch{DATA}
 
 Branch and bound search interface in element of type DATA.
 
 This interface provide an iterable that perform the search.
 
-There is currently three types of search supported `BreadFirstBPSearch`,
-`DepthFirstBPSearch` and `KeyBPSearch`, each one processing the element of the
+There is currently three types of search supported `BreadFirstAbstractSearch`,
+`AbstractDepthFirstSearch` and `AbstractKeySearch`, each one processing the element of the
 tree in a different order. When subtyping one of these, the following methods
 must be implemented:
-  - `root_element(::BPSearch)`: return the element with which the search is started
-  - `process(::BPSearch, elem::DATA)`: return a symbol representing the action
+  - `root_element(::AbstractSearch)`: return the element with which the search is started
+  - `process(::AbstractSearch, elem::DATA)`: return a symbol representing the action
         to perform with the element `elem` and an object of type `DATA` representing
         the state of the element after processing (may return `elem` unchanged).
-  - `bisect(::BPSearch, elem::DATA)`: return two elements of type `DATA` build
+  - `bisect(::AbstractSearch, elem::DATA)`: return two elements of type `DATA` build
         by bisecting `elem`
 
-Subtyping `BPSearch` directly allows to have control over the order in which
+Subtyping `AbstractSearch` directly allows to have control over the order in which
 the elements are process. To do this the following methods must be implemented:
-  - `root_element(::BPSearch)`: return the first element to be processed. Use
+  - `root_element(::AbstractSearch)`: return the first element to be processed. Use
         to build the initial tree.
-  - `get_leaf_id!(::BPSearch, wt::BPTree)`: return the id of the next leaf that
+  - `get_leaf_id!(::AbstractSearch, wt::BPTree)`: return the id of the next leaf that
         will be processed and remove it from the list of working leaves of `wt`.
-  - `insert_leaf!(::BPSearch, wt::BPTree, leaf::BPLeaf)`: insert a leaf in the
+  - `insert_leaf!(::AbstractSearch, wt::BPTree, leaf::BPLeaf)`: insert a leaf in the
         list of working leaves.
 
 # Valid symbols returned by the process function
@@ -32,56 +32,56 @@ the elements are process. To do this the following methods must be implemented:
         be processed
   - `:discard`: the element is discarded from the tree, allowing to free memory
 """
-abstract type BPSearch{DATA} end
+abstract type AbstractSearch{DATA} end
 
-abstract type BreadthFirstBPSearch{DATA} <: BPSearch{DATA} end
-abstract type DepthFirstBPSearch{DATA} <: BPSearch{DATA} end
+abstract type AbstractBreadthFirstSearch{DATA} <: AbstractSearch{DATA} end
+abstract type AbstractDepthFirstSearch{DATA} <: AbstractSearch{DATA} end
 
 
 # TODO should be smallest key first to match sort functions
 """
-    KeyBPSearch{DATA} <: BPSearch{DATA}
+    AbstractKeySearch{DATA} <: AbstractSearch{DATA}
 
 Interface to a branch and bound search that use a key function to decide which
 element to process first. The search process first the element with the largest
-key as computed by `keyfunc(ks::KeyBPSearch, elem)`.
+key as computed by `keyfunc(ks::AbstractKeySearch, elem)`.
 
 !!! warning
     Untested.
 """
-abstract type KeyBPSearch{DATA} <: BPSearch{DATA} end
+abstract type AbstractKeySearch{DATA} <: AbstractSearch{DATA} end
 
 """
-    root_element(search::BPSearch)
+    root_element(search::AbstractSearch)
 
 Return the initial element of the search. The `BPTree` will be build around it.
 
-Can be define for custom searches that are direct subtype of `BPSearch`, default
+Can be define for custom searches that are direct subtype of `AbstractSearch`, default
 behavior is to fetch the field `initial` of the search.
 """
-root_element(search::BPSearch) = search.initial
+root_element(search::AbstractSearch) = search.initial
 
 """
-    get_leaf_id!(::BPSearch, wt::BPTree)
+    get_leaf_id!(::AbstractSearch, wt::BPTree)
 
 Return the id of the next leaf that will be processed and remove it from the
 list of working leaves.
 
-Must be define for custom searches that are direct subtype of `BPSearch`.
+Must be define for custom searches that are direct subtype of `AbstractSearch`.
 """
-get_leaf_id!(::BreadthFirstBPSearch, wt::BPTree) = popfirst!(wt.working_leaves)
-get_leaf_id!(::DepthFirstBPSearch, wt::BPTree) = pop!(wt.working_leaves)
-get_leaf_id!(::KeyBPSearch, wt::BPTree) = popfirst!(wt.working_leaves)
+get_leaf_id!(::AbstractBreadthFirstSearch, wt::BPTree) = popfirst!(wt.working_leaves)
+get_leaf_id!(::AbstractDepthFirstSearch, wt::BPTree) = pop!(wt.working_leaves)
+get_leaf_id!(::AbstractKeySearch, wt::BPTree) = popfirst!(wt.working_leaves)
 
 """
-    insert_leaf!(::BPSearch, wt::BPTree, leaf::BPLeaf)
+    insert_leaf!(::AbstractSearch, wt::BPTree, leaf::BPLeaf)
 
 Insert the id of a new leaf that has been produced by bisecting an older leaf
 into the list of working leaves.
 
-Must be define for custom searches that are direct subtype of `BPSearch`.
+Must be define for custom searches that are direct subtype of `AbstractSearch`.
 """
-function insert_leaf!(::Union{BreadthFirstBPSearch{DATA}, DepthFirstBPSearch{DATA}},
+function insert_leaf!(::Union{AbstractBreadthFirstSearch{DATA}, AbstractDepthFirstSearch{DATA}},
                       wt::BPTree{DATA}, leaf::BPLeaf{DATA}) where {DATA}
     id = newid(wt)
     wt.leaves[id] = leaf
@@ -89,7 +89,7 @@ function insert_leaf!(::Union{BreadthFirstBPSearch{DATA}, DepthFirstBPSearch{DAT
     return id
 end
 
-function insert_leaf!(::KS, wt::BPTree{DATA}, leaf::BPLeaf{DATA}) where {DATA, KS <: KeyBPSearch{DATA}}
+function insert_leaf!(::KS, wt::BPTree{DATA}, leaf::BPLeaf{DATA}) where {DATA, KS <: AbstractKeySearch{DATA}}
     id = newid(wt)
     wt.leaves[id] = leaf
     keys = keyfunc.(KS, wt.working_leaves)
@@ -100,10 +100,10 @@ function insert_leaf!(::KS, wt::BPTree{DATA}, leaf::BPLeaf{DATA}) where {DATA, K
     return id
 end
 
-eltype(::Type{BPS}) where {DATA, BPS <: BPSearch{DATA}} = BPTree{DATA}
-IteratorSize(::Type{BPS}) where {BPS <: BPSearch} = Base.SizeUnknown()
+eltype(::Type{BPS}) where {DATA, BPS <: AbstractSearch{DATA}} = BPTree{DATA}
+IteratorSize(::Type{BPS}) where {BPS <: AbstractSearch} = Base.SizeUnknown()
 
-function iterate(search::BPSearch{DATA},
+function iterate(search::AbstractSearch{DATA},
                  wt::BPTree=BPTree(root_element(search))) where {DATA}
 
     isempty(wt.working_leaves) && return nothing

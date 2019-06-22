@@ -1,5 +1,5 @@
 # Implement the interface for breadth first in a dummy way
-struct DummyBreadthFirstSearch <: BreadthFirstBPSearch{Symbol} end
+struct DummyBreadthFirstSearch <: AbstractBreadthFirstSearch{Symbol} end
 
 @testset "Forced implementations" begin
     search = DummyBreadthFirstSearch()
@@ -9,7 +9,7 @@ struct DummyBreadthFirstSearch <: BreadthFirstBPSearch{Symbol} end
     @test_throws MissingImplementationError BranchAndPrune.process(search, tree)
 
     # TODO add test for get_leaf_id! and insert_leaf! for general searches
-    # TODO add test for keyfunc for KeyBPSearch
+    # TODO add test for keyfunc for AbstractKeySearch
 end
 
 BranchAndPrune.process(::DummyBreadthFirstSearch, s::Symbol) = s, s

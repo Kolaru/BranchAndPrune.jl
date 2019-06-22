@@ -6,7 +6,7 @@ struct Interval
 end
 
 # Search the zero of a monotonic function
-struct ZeroSearch <: DepthFirstBPSearch{Interval}
+struct ZeroSearch <: AbstractDepthFirstSearch{Interval}
     f::Function
     initial::Interval
     tol::Float64
@@ -43,14 +43,15 @@ function find_zero(f, interval)
     end
 
     println("Search finished in $niter iterations.")
-    if nnodes(endtree) == 0
+    d = data(endtree)  # Retrieve the data from the tree
+    if length(d) == 0
         println("The function has no zero.")
     else
-        # If there is a zero, the tree will have only one leaf
-        z = data(endtree)[1]
+        # If there is a zero, the tree will have only one data available
+        z = [1]
         println("The function has a zero in the interval [$(z.lo), $(z.hi)].")
     end
 end
 
-find_zero(x -> x/3 + 5, Interval(-20, 20))
-find_zero(x -> (x - 4)^3 - 8, Interval(-20, 20))
+find_zero(x -> x/3 + 5, Interval(-20, 20))  # Exact solution is -15
+find_zero(x -> (x - 4)^3 - 8, Interval(-20, 20))  # Exact solution is 6

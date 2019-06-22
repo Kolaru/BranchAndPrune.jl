@@ -10,7 +10,7 @@ Base.showerror(io::IO, e::MissingImplementationError) =
 
 
 """
-    bisect(::BPSearch, elem)
+    bisect(::AbstractSearch, elem)
 
 Return two new elements built by bisecting `elem`.
 
@@ -19,44 +19,44 @@ Returned elements must have the same type as the bisected element.
 Must be implemented by the user for custom search types, default implementation
 throw a `MissingImplementationError`.
 """
-bisect(::BPSearch, elem) = throw(MissingImplementationError(:bisect, "custom search types"))
+bisect(::AbstractSearch, elem) = throw(MissingImplementationError(:bisect, "custom search types"))
 
 
 """
-    get_leaf_id!(::BPSearch, wt::BPTree)
+    get_leaf_id!(::AbstractSearch, wt::BPTree)
 
 Return the `id` of the next leaf that must be processed and remove this leaf
 from the list of working leaves of the working tree `wt`.
 """
-get_leaf_id!(::BPSearch, wt) = throw(MissingImplementationError(:get_leaf_id, "custom search types"))
+get_leaf_id!(::AbstractSearch, wt) = throw(MissingImplementationError(:get_leaf_id, "custom search types"))
 
 
 """
-    insert_leaf!(::BPSearch, wt::BPTree, leaf::BPLeaf)
+    insert_leaf!(::AbstractSearch, wt::BPTree, leaf::BPLeaf)
 
 Insert a leaf in the list of working leaves in the tree `wt`.
 
 Must be implemented by the user for custom search types, default implementation
 throw a `MissingImplementationError`.
 """
-insert_leaf!(::BPSearch, wt) = throw(MissingImplementationError(:insert_leaf!, "custom search types"))
+insert_leaf!(::AbstractSearch, wt) = throw(MissingImplementationError(:insert_leaf!, "custom search types"))
 
 
 """
-    keyfunc(::KeyBPSearch, elem)
+    keyfunc(::AbstractKeySearch, elem)
 
-Return the key associated with element `elem` for a `KeyBPSearch`.
+Return the key associated with element `elem` for a `AbstractKeySearch`.
 
-The `KeyBPSearch` processes elements with the largest key first.
+The `AbstractKeySearch` processes elements with the largest key first.
 
 Must be implemented by the user, default implementation throw a
 `MissingImplementationError`.
 """
-keyfunc(::KeyBPSearch, elem) = throw(MissingImplementationError(:keyfunc, "KeyBPSearch"))
+keyfunc(::AbstractKeySearch, elem) = throw(MissingImplementationError(:keyfunc, "AbstractKeySearch"))
 
 
 """
-    process(::BPSearch, elem)`
+    process(::AbstractSearch, elem)`
 
 Return a symbol representing the action to perform with the element `elem` and
 an object (of the same type) representing the state of the element after
@@ -72,4 +72,4 @@ processing (may return `elem` unchanged).
 Must be implemented by the user for custom search types, default implementation
 throw a `MissingImplementationError`.
 """
-process(::BPSearch, wt) = throw(MissingImplementationError(:process, "custom search types"))
+process(::AbstractSearch, wt) = throw(MissingImplementationError(:process, "custom search types"))
