@@ -2,3 +2,6 @@ name = "BranchAndPrune"
 uuid = "d3bc4f2e-91e6-11e9-365e-cd067da536ce"
 authors = ["Benoît Richard <kolaru@hotmail.com>"]
 version = "0.1.0"
+
+[compat]
+julia="1.0.0"
