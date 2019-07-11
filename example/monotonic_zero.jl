@@ -48,7 +48,7 @@ function find_zero(f, interval)
         println("The function has no zero.")
     else
         # If there is a zero, the tree will have only one data available
-        z = [1]
+        z = d[1]
         println("The function has a zero in the interval [$(z.lo), $(z.hi)].")
     end
 end
