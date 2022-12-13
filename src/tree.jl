@@ -1,35 +1,17 @@
-abstract type AbstractBPNode end
-
 """
-    BPNode <: AbstractBPNode
+    BPNode{DATA}
 
-Intermediate node of a `BPTree`. Does not contain any data by itself,
-only redirect toward its children.
+Node of a `BPTree` containing some data.
+Its status is one of
+    - `:working`: for a leaf that need further processing.
+    - `:final`: for a leaf in its final state.
+    - `:node`: for an intermediate node that doesn't contain data.
 """
-struct BPNode <: AbstractBPNode
-    parent::Int
-    children::Vector{Int}
-end
-
-"""
-    BPLeaf{DATA} <: AbstractBPLeaf
-
-Leaf node of a `BPTree` that contains some data. Its status is either
-  - `:working`: the leaf will be further processed.
-  - `:final`: the leaf won't be touched anymore.
-"""
-struct BPLeaf{DATA} <: AbstractBPNode
-    data::DATA
-    parent::Int
+struct BPNode{DATA}
+    parent::Union{Nothing, BPNode{DATA}}
+    children::Vector{BPNode{DATA}}
+    data::Union{Nothing, DATA}
     status::Symbol
-end
-
-function BPLeaf(data::DATA, parent::Int) where {DATA}
-    BPLeaf{DATA}(data, parent, :working)
-end
-
-function BPNode(leaf::BPLeaf, child1::Int, child2::Int)
-    BPNode(leaf.parent, Int[child1, child2])
 end
 
 """
@@ -38,16 +20,12 @@ end
 Tree storing the data used and produced by a branch and bound search in a
 structured way.
 
-Nodes and leaves can be accessed using their index using the bracket syntax
-`wt[node_id]`. However this is slow, as nodes and leaves are stored separately.
-
 Support the iterator interface. The element yielded by the iteration are
 tuples `(node_id, lvl)` where `lvl` is the depth of the node in the tree.
 """
 struct BPTree{DATA}
-    nodes::Dict{Int, BPNode}
-    leaves::Dict{Int, BPLeaf{DATA}}
-    working_leaves::Vector{Int}
+    root::BPNode{DATA}
+    working_leaves::Vector{BPNode{DATA}}
 end
 
 function BPTree(rootdata::DATA) where {DATA}
@@ -55,10 +33,13 @@ function BPTree(rootdata::DATA) where {DATA}
     BPTree{DATA}(Dict{Int, BPNode}(), Dict(1 => rootleaf), Int[1])
 end
 
-show(io::IO, wn::BPNode) = print(io, "Node with children $(wn.children)")
-
-function show(io::IO, wl::BPLeaf)
-    print(io, "Leaf (:$(wl.status)) with data $(wl.data)")
+# TODO plain/text business to have valid repr
+function show(io::IO, node::BPNode)
+    if node.status == :node
+        print(io, "Node with children $(node.children)")
+    else
+        print(io, "Leaf (:$(node.status)) with data $(node.data)")
+    end
 end
 
 function show(io::IO, wt::BPTree{DATA}) where {DATA}
@@ -75,7 +56,7 @@ end
 
 # Root node has id 1 and parent id 0
 root(wt::BPTree) = wt[1]
-is_root(wt::BPTree, id::Int) = (id == 1)
+is_root(::BPTree, id::Int) = (id == 1)
 
 """
     nnodes(wt::BPTree)
@@ -154,7 +135,6 @@ end
 function recursively_delete_parent!(wt, id_parent, id_child)
     if !is_root(wt, id_child)
         parent = wt.nodes[id_parent]
-        siblings = parent.children
         if length(parent.children) == 1  # The child has no siblings, so delete the parent
             delete!(wt.nodes, id_parent)
             recursively_delete_parent!(wt, parent.parent, id_parent)

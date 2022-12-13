@@ -37,6 +37,17 @@ abstract type AbstractSearch{DATA} end
 abstract type AbstractBreadthFirstSearch{DATA} <: AbstractSearch{DATA} end
 abstract type AbstractDepthFirstSearch{DATA} <: AbstractSearch{DATA} end
 
+struct BPSearch{DATA, S, F, G}
+    tree::BPTree{DATA}
+    strategy::S
+    process::F
+    bisect::G
+end
+
+struct Strategy
+end
+
+
 
 # TODO should be smallest key first to match sort functions
 """
