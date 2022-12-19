@@ -14,6 +14,8 @@ struct BPNode{DATA}
     status::Symbol
 end
 
+
+
 """
     BPTree{DATA}
 
@@ -25,7 +27,6 @@ tuples `(node_id, lvl)` where `lvl` is the depth of the node in the tree.
 """
 struct BPTree{DATA}
     root::BPNode{DATA}
-    working_leaves::Vector{BPNode{DATA}}
 end
 
 function BPTree(rootdata::DATA) where {DATA}

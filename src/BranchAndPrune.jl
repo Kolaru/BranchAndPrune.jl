@@ -9,6 +9,5 @@ export copy, eltype, iterate, IteratorSize, nnodes
 
 include("tree.jl")
 include("search.jl")
-include("forced_definitions.jl")
 
 end  # module
