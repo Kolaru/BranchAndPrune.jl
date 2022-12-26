@@ -30,18 +30,18 @@ directive `:stop` by the process function.
 For early stopping, either manually break the iteration loop, or use
 the function `bpsearch(callback, search)`.
 """
-struct BranchAndPruneSearch{S, F, G, REGION}
+struct BranchAndPruneSearch{S, REGION, F, G}
     process::F
     bisect::G
     initial_region::REGION
 end
 
-function BranchAndPruneSearch(S, process, bisect, initial_region)
-    BranchAndPruneSearch{S}(process, bisect, initial_region)
+function BranchAndPruneSearch(S, process::F, bisect::G, initial_region::R) where {F, G, R}
+    BranchAndPruneSearch{S, R, F, G}(process, bisect, initial_region)
 end
 
-eltype(::Type{BPS}) where {S, REGION, BPS <: BranchAndPruneSearch{S, REGION}} = SearchState{S, REGION}
-IteratorSize(::Type{BPS}) where {BPS <: BranchAndPruneSearch} = Base.SizeUnknown()
+Base.eltype(::Type{BPS}) where {S, REGION, BPS <: BranchAndPruneSearch{S, REGION}} = SearchState{S, REGION}
+Base.IteratorSize(::Type{BPS}) where {BPS <: BranchAndPruneSearch} = Base.SizeUnknown()
 
 struct SearchState{S, REGION}
     search_order::S
@@ -49,12 +49,12 @@ struct SearchState{S, REGION}
     final_leaves::Vector{BPNode{REGION}}
 end
 
-function SearchState(S, initial_region)
+function SearchState(S, initial_region::REGION) where REGION
     root = BPNode(:working, initial_region, nothing, :left)
-    return SearchState(S(root), root, [])
+    return SearchState(S(root), root, BPNode{REGION}[])
 end
 
-function iterate(
+function Base.iterate(
         bp::BranchAndPruneSearch{S},
         state = SearchState(S, bp.initial_region)) where S
 
@@ -94,21 +94,22 @@ struct BranchAndPruneResult{S, REGION}
 end
 
 # TODO Docstring
-function bpsearch(bp::BranchAndPruneSearch ; callback = (state -> false))
-    local state
+function bpsearch(bp::BranchAndPruneSearch{<:Any, REGION} ; callback = (state -> false)) where REGION
+    endstate = nothing
 
     for state in bp
+        endstate = state
         callback(state) && break
     end
 
-    unifinished_regions = working_leaves(state.search_order)
+    unfinished_leaves = working_leaves(endstate.search_order)
 
     return BranchAndPruneResult(
-        state.search_order,
+        endstate.search_order,
         bp.initial_region,
-        state.tree,
-        state.final_leaves,
-        unifinished_regions,
-        isempty(unifinished_regions)
+        endstate.tree,
+        REGION[leaf.region for leaf in endstate.final_leaves],
+        REGION[leaf.region for leaf in unfinished_leaves],
+        isempty(unfinished_leaves)
     )
 end
