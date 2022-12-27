@@ -70,6 +70,7 @@ function Base.iterate(
     elseif action == :branch
         left_data, right_data = bp.bisect(region)
         node.region = nothing
+        node.status = :branching
         node.left_child = BPNode(:working, left_data, node, :left)
         node.right_child = BPNode(:working, right_data, node, :right)
         push!(search, node.left_child)
@@ -94,7 +95,10 @@ struct BranchAndPruneResult{S, REGION}
 end
 
 # TODO Docstring
-function bpsearch(bp::BranchAndPruneSearch{<:Any, REGION} ; callback = (state -> false)) where REGION
+function bpsearch(
+        bp::BranchAndPruneSearch{<:Any, REGION} ;
+        callback = (state -> false),
+        simplify = true) where REGION
     endstate = nothing
 
     for state in bp
@@ -103,6 +107,10 @@ function bpsearch(bp::BranchAndPruneSearch{<:Any, REGION} ; callback = (state ->
     end
 
     unfinished_leaves = working_leaves(endstate.search_order)
+
+    if simplify
+        simplify_tree!(endstate.tree)
+    end
 
     return BranchAndPruneResult(
         endstate.search_order,

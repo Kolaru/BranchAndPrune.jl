@@ -1,5 +1,7 @@
 module BranchAndPrune
 
+using AbstractTrees
+
 export BranchAndPruneSearch, bpsearch
 export BreadthFirst, DepthFirst
 
