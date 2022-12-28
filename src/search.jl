@@ -43,15 +43,28 @@ end
 Base.eltype(::Type{BPS}) where {S, REGION, BPS <: BranchAndPruneSearch{S, REGION}} = SearchState{S, REGION}
 Base.IteratorSize(::Type{BPS}) where {BPS <: BranchAndPruneSearch} = Base.SizeUnknown()
 
+"""
+    SearchState{S, REGION}
+
+State of a search by branch and prune.
+
+Field
+=====
+- search_order::SearchOrder : The order in which the search is performed.
+    Contains information about the state of the search. See `SearchOrder`
+    for more details.
+- tree::BPNode{REGION} : The current binary tree representing the search.
+    It is mutated as the search progress.
+- final_leaves::Vector{BPNode{REGION}}
+"""
 struct SearchState{S, REGION}
     search_order::S
     tree::BPNode{REGION}
-    final_leaves::Vector{BPNode{REGION}}
 end
 
 function SearchState(S, initial_region::REGION) where REGION
     root = BPNode(:working, initial_region, nothing, :left)
-    return SearchState(S(root), root, BPNode{REGION}[])
+    return SearchState(S(root), root)
 end
 
 function Base.iterate(
@@ -59,14 +72,14 @@ function Base.iterate(
         state = SearchState(S, bp.initial_region)) where S
 
     search = state.search_order
-    isempty(working_leaves(search)) && return nothing
 
     node = pop!(search)
+    isnothing(node) && return nothing
+
     action, region = bp.process(node.region)
     if action == :stop
         node.region = region
         node.status = :final
-        push!(state.final_leaves, node)
     elseif action == :branch
         left_data, right_data = bp.bisect(region)
         node.region = nothing
@@ -92,6 +105,24 @@ struct BranchAndPruneResult{S, REGION}
     final_regions::Vector{REGION}
     unfinished_regions::Vector{REGION}
     converged::Bool
+end
+
+function BranchAndPruneResult(
+        search_order,
+        initial_region::REGION,
+        tree::BPNode{REGION}) where REGION
+    
+    final_regions = REGION[leaf.region for leaf in Leaves(tree) if leaf.status == :final]
+    unfinished_regions = REGION[leaf.region for leaf in Leaves(tree) if leaf.status == :working]
+
+    return BranchAndPruneResult(
+        search_order,
+        initial_region,
+        tree,
+        final_regions,
+        unfinished_regions,
+        isempty(unfinished_regions)
+    )
 end
 
 function padded_string(val  ; padding = 1, skip = 0)
@@ -129,8 +160,6 @@ function bpsearch(
         callback(state) && break
     end
 
-    unfinished_leaves = working_leaves(endstate.search_order)
-
     if simplify
         simplify_tree!(endstate.tree)
     end
@@ -138,9 +167,6 @@ function bpsearch(
     return BranchAndPruneResult(
         endstate.search_order,
         bp.initial_region,
-        endstate.tree,
-        REGION[leaf.region for leaf in endstate.final_leaves],
-        REGION[leaf.region for leaf in unfinished_leaves],
-        isempty(unfinished_leaves)
+        endstate.tree
     )
 end
