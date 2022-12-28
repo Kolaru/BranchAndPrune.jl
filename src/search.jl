@@ -28,7 +28,7 @@ WARNING
 By default, the search only ends when all remaining regions are given the
 directive `:stop` by the process function.
 For early stopping, either manually break the iteration loop, or use
-the function `bpsearch(callback, search)`.
+`bpsearch(callback, search)`.
 """
 struct BranchAndPruneSearch{S, REGION, F, G}
     process::F
@@ -92,6 +92,29 @@ struct BranchAndPruneResult{S, REGION}
     final_regions::Vector{REGION}
     unfinished_regions::Vector{REGION}
     converged::Bool
+end
+
+function padded_string(val  ; padding = 1, skip = 0)
+    buffer = IOBuffer()
+    show(buffer, MIME"text/plain"(), val)
+    s = String(take!(buffer))
+    pad = " "^padding
+    lines = split(s, "\n")[1 + skip:end]
+    return pad * join(lines, "\n" * pad)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", res::BranchAndPruneResult)
+    ctx = IOContext(io, :compact => true)
+    println(io, "BranchAndPruneResult")
+    println(io, " converged: $(res.converged)")
+    print(io, " initial region: ")
+    show(ctx, MIME"text/plain"(), res.initial_region)
+    println(io)
+    println(io, " final regions:\n", padded_string(res.final_regions ; skip = 1))
+    if !res.converged
+        println(io)
+        println(io, " unfinished regions:\n", padded_string(res.unfinished_regions ; skip = 1))
+    end
 end
 
 # TODO Docstring

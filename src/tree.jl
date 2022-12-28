@@ -23,6 +23,8 @@ function BPNode(status, region, parent, side)
     BPNode(status, region, parent, side == :left, nothing, nothing)
 end
 
+Base.show(io::IO, ::MIME"text/plain", tree::BPNode) = print_tree(io, tree) 
+
 """
 
 """
