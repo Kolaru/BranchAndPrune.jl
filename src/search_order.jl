@@ -1,9 +1,17 @@
 """
-TODO finish
+    SearchOrder
+
+Abstract type representing the order of processing during a branch and
+prune search.
+
 For custom search orders following methods must be implemented:
-- `pop!(so::SearchOrder)`: return the next leaf to be processed and remove it
-    from the set of working leaves. Return `nothing` when the search is done.
-- `push!(so::SearchOrder, leaf::BPNode)`: add a leaf to the set of working leaves.
+- `pop!(so::SearchOrder)`: return the next leaf to be processed.
+    Return `nothing` when the search is done.
+- `push!(so::SearchOrder, leaf::BPNode)`: add a leaf to the set of leaves to be
+    processed.
+
+The object is initialized by giving it the root node of the search tree,
+as `SearchOrder(root::BPNode)`.
 """
 abstract type SearchOrder end
 
@@ -20,11 +28,13 @@ end
 BreadthFirst(root::BPNode) = BreadthFirst([root])
 
 """
-    pop!(::AbstractSearch, tree::BPTree)
+    pop!(::SearchOrder)
 
-Return the next leaf that will be processed and remove it from the
-list of working leaves. Must `nothing` if there is no more data to process
-and the search should stop.
+Return the next leaf that will be processed.
+
+Can modify the internal state of the SearchOrder.
+
+Must return `nothing` if there is no more data to process.
 
 Must be define for custom search orders.
 """
@@ -32,9 +42,11 @@ Base.pop!(so::DepthFirst) = isempty(so.working_leaves) ? nothing : popfirst!(so.
 Base.pop!(so::BreadthFirst) = isempty(so.working_leaves) ? nothing : pop!(so.working_leaves)
 
 """
-    push!(::AbstractSearch, tree::BPTree, leaf::BPNode)
+    push!(::SearchOrder, leaf::BPNode)
 
-TODO
+Add a leaf to the set of nodes that need to be processed.
+
+Can modify the internal state of the SearchOrder.
 
 Must be define for custom search orders.
 """

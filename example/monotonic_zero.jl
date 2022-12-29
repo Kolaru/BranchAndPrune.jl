@@ -9,11 +9,11 @@ function process(f, interval, tol = 1e-8)
     ylo = f(interval.lo)
     yhi = f(interval.hi)
 
-    # If both have the same time they are on the same side of the zero
+    # If both have the same sign they are on the same side of the zero
     if ylo*yhi > 0
         return :prune, interval
     elseif interval.hi - interval.lo < tol
-        return :stop, interval
+        return :store, interval
     else
         return :branch, interval
     end
@@ -29,5 +29,5 @@ function find_zero(f, interval)
     return bpsearch(search)
 end
 
-sol = find_zero(x -> x/3 + 5, Interval(-20, 20))  # Exact solution is -15
+find_zero(x -> x/3 + 5, Interval(-20, 20))  # Exact solution is -15
 find_zero(x -> (x - 4)^3 - 8, Interval(-20, 20))  # Exact solution is 6

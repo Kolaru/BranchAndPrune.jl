@@ -2,33 +2,36 @@
     BranchAndPruneSearch(S, process, bisect, initial_region)
 
 Branch and prune search, using the search order `S` on the given initial region.
+It works by recursively bisecting the regions of search with `bisect` until
+all regions are found satisfactory according to `process`.
+Build a binary tree relating the regions to each other as the search progress.
 
-`process` and `bisect` are used to perform the search in the searched regions.
-They both take a single region as an argument.
+`process` and `bisect` both take a single region as an argument.
 
 `process` must return an action to perform and the region on which
 to perform it. The possible actions are
-    - `:stop`: the region is considered as final, is stored, and is not
-        further processed.
-    - `:branch`: the element is bisected and each of the two resulting part
-        are processed independently.
-    - `:prune`: the element is discarded from the tree.
-        If it is the last descendant of a branch, the whole branch is pruned
-        from the tree.
+- `:store`: the region is considered as final, is stored, and is not
+    further processed.
+- `:branch`: the element is bisected and each of the two resulting part
+    are processed independently.
+- `:prune`: the element is discarded from the tree.
+    If it is the last descendant of a branch, the whole branch is pruned
+    from the tree.
+    The intermediate nodes with a single descendant are also removed from the tree.
 The initial region can be returned unchanged if no refinement is possible at
 this stage.
 
 `bisect` is used when a region is marked to be branched.
-It must return two subregions of the original one.
+It must return two subregions of the original one, and of the same type.
 
 `BranchAndPruneSearch` objects are iterable, exhausting the iterable
 performs the full search.
 
 WARNING
 By default, the search only ends when all remaining regions are given the
-directive `:stop` by the process function.
-For early stopping, either manually break the iteration loop, or use
-`bpsearch(callback, search)`.
+directive `:store` by the process function.
+For stopping based on different criterion, either manually break the iteration
+loop or use `bpsearch(search ; callback)` with a custom callback function.
 """
 struct BranchAndPruneSearch{S, REGION, F, G}
     process::F
@@ -48,24 +51,23 @@ Base.IteratorSize(::Type{BPS}) where {BPS <: BranchAndPruneSearch} = Base.SizeUn
 
 State of a search by branch and prune.
 
-The search is stateful and the state is mutated during it.
-
 Field
 =====
-- search_order::SearchOrder : The order in which the search is performed.
+- `search_order``::SearchOrder : The order in which the search is performed.
     Contains information about the state of the search.
     See `SearchOrder` for more details.
-- tree::BPNode{REGION} : The current binary tree representing the search.
-- final_leaves::Vector{BPNode{REGION}}
+- `tree`::BPNode{REGION} : The current binary tree representing the search.
+- `iteration`::Int
 """
 struct SearchState{S, REGION}
     search_order::S
     tree::BPNode{REGION}
+    iteration::Int
 end
 
 function SearchState(S, initial_region::REGION) where REGION
     root = BPNode(:working, initial_region, nothing, :left)
-    return SearchState(S(root), root)
+    return SearchState(S(root), root, 1)
 end
 
 function Base.iterate(
@@ -78,7 +80,7 @@ function Base.iterate(
     isnothing(node) && return nothing
 
     action, region = bp.process(node.region)
-    if action == :stop
+    if action == :store
         node.region = region
         node.status = :final
     elseif action == :branch
@@ -94,11 +96,34 @@ function Base.iterate(
     else
         error("process function for the search return " *
               "unknown action :$action for region of type $(typeof(region)). " *
-              "Valid actions are :stop, :branch and :prune.")
+              "Valid actions are :store, :branch and :prune.")
     end
-    return state, state
+
+    new_state = SearchState(
+        state.search_order,
+        state.tree,
+        state.iteration + 1
+    )
+    return new_state, new_state
 end
 
+"""
+    BranchAndPruneResult
+
+Type representing the result of a branch and prune search.
+
+Fields
+======
+- `search_order::SearchOrder`
+- `initial_region`
+- `tree::BPNode`: Root of the search tree constructed during the search.
+- `final_regions`: Vector of all the regions that have been labelled with `:store`
+    during the search.
+- `unfinished_regions`: Vector of all the regions that have been produced by
+    bisection but never processed.
+    Non empty only if the search is stopped early.
+- `converged::Bool`: Whether the search has run up to the end.
+"""
 struct BranchAndPruneResult{S, REGION}
     search_order::S
     initial_region::REGION
@@ -149,11 +174,19 @@ function Base.show(io::IO, ::MIME"text/plain", res::BranchAndPruneResult)
     end
 end
 
-# TODO Docstring
+"""
+    bpsearch(bp::BranchAndPruneSearch ; callback::Function)
+
+Perform a branch and prune search and return its result as a BranchAndPruneResult.
+
+A callback function can be given, which is called on the search state
+at every iteration.
+It must have signature `callback(state::SearchState)::Bool`.
+If it return `true` the searched is stopped and return.
+"""
 function bpsearch(
         bp::BranchAndPruneSearch ;
-        callback = (state -> false),
-        squash = true)
+        callback = (state -> false))
     endstate = nothing
 
     for state in bp

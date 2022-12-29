@@ -5,10 +5,10 @@ Node of a binary tree designed for branch and prune search.
 It represents a search region and its status.
 
 Its status is one of
-    - `:working`: for a leaf that need further processing.
-    - `:final`: for a leaf in its final state.
-    - `:branching`: for an intermediate node. In this case the data about the
-        represented region is not stored in the node, but in its descendents.
+- `:working`: for a leaf that need further processing.
+- `:final`: for a leaf in its final state.
+- `:branching`: for an intermediate node. In this case the data about the
+    represented region is not stored in the node, but in its descendents.
 """
 mutable struct BPNode{REGION}
     status::Symbol
@@ -26,7 +26,13 @@ end
 Base.show(io::IO, ::MIME"text/plain", tree::BPNode) = print_tree(io, tree) 
 
 """
+    prune!(node::BPNOde ; squash = true)
 
+Remove the node from the tree, and recursively all branching nodes
+that are left without descendant.
+
+If `squash` is true, modify the tree to skip intermediate branching node
+with a single descendant.
 """
 function prune!(node::BPNode ; squash = true)
     parent = node.parent
