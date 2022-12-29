@@ -48,13 +48,14 @@ Base.IteratorSize(::Type{BPS}) where {BPS <: BranchAndPruneSearch} = Base.SizeUn
 
 State of a search by branch and prune.
 
+The search is stateful and the state is mutated during it.
+
 Field
 =====
 - search_order::SearchOrder : The order in which the search is performed.
-    Contains information about the state of the search. See `SearchOrder`
-    for more details.
+    Contains information about the state of the search.
+    See `SearchOrder` for more details.
 - tree::BPNode{REGION} : The current binary tree representing the search.
-    It is mutated as the search progress.
 - final_leaves::Vector{BPNode{REGION}}
 """
 struct SearchState{S, REGION}
@@ -150,9 +151,9 @@ end
 
 # TODO Docstring
 function bpsearch(
-        bp::BranchAndPruneSearch{<:Any, REGION} ;
+        bp::BranchAndPruneSearch ;
         callback = (state -> false),
-        simplify = true) where REGION
+        squash = true)
     endstate = nothing
 
     for state in bp
@@ -160,13 +161,17 @@ function bpsearch(
         callback(state) && break
     end
 
-    if simplify
-        simplify_tree!(endstate.tree)
+    tree = endstate.tree
+
+    # Remove the root node if it has a single child
+    if length(children(tree)) == 1
+        tree = only(children(tree))
+        tree.parent = nothing
     end
 
     return BranchAndPruneResult(
         endstate.search_order,
         bp.initial_region,
-        endstate.tree
+        tree
     )
 end

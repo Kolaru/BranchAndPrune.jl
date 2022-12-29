@@ -28,7 +28,7 @@ Base.show(io::IO, ::MIME"text/plain", tree::BPNode) = print_tree(io, tree)
 """
 
 """
-function prune!(node::BPNode)
+function prune!(node::BPNode ; squash = true)
     parent = node.parent
 
     if isnothing(parent)
@@ -45,23 +45,24 @@ function prune!(node::BPNode)
         isnothing(parent.left_child) && return prune!(parent)
         parent.right_child = nothing
     end
+    squash && return squash_node!(parent)
 end
 
-function simplify_tree!(tree::BPNode)
-    for node in PreOrderDFS(tree)
-        isroot(node) && continue
-        childs = children(node)
-        length(childs) != 1 && continue
-        child = only(childs)
-        child.parent = node.parent
+squash_node!(::Nothing) = nothing
 
-        if node.is_left_child
-            node.parent.left_child = child
-            child.is_left_child = true
-        else
-            node.parent.right_child = child
-            child.is_left_child = false
-        end
+function squash_node!(node::BPNode)
+    parent = node.parent
+    isnothing(parent) && return
+    child = only(children(node))
+
+    if node.is_left_child
+        parent.left_child = child
+        child.is_left_child = true
+        child.parent = parent
+    else
+        parent.right_child = child
+        child.is_left_child = false
+        child.parent = parent
     end
 end
 
