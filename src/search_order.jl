@@ -38,8 +38,8 @@ Must return `nothing` if there is no more data to process.
 
 Must be define for custom search orders.
 """
-Base.pop!(so::DepthFirst) = isempty(so.working_leaves) ? nothing : popfirst!(so.working_leaves)
-Base.pop!(so::BreadthFirst) = isempty(so.working_leaves) ? nothing : pop!(so.working_leaves)
+Base.pop!(so::BreadthFirst) = isempty(so.working_leaves) ? nothing : popfirst!(so.working_leaves)
+Base.pop!(so::DepthFirst) = isempty(so.working_leaves) ? nothing : pop!(so.working_leaves)
 
 """
     push!(::SearchOrder, leaf::BPNode)

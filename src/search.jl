@@ -169,7 +169,6 @@ function Base.show(io::IO, ::MIME"text/plain", res::BranchAndPruneResult)
     println(io)
     println(io, " final regions:\n", padded_string(res.final_regions ; skip = 1))
     if !res.converged
-        println(io)
         println(io, " unfinished regions:\n", padded_string(res.unfinished_regions ; skip = 1))
     end
 end

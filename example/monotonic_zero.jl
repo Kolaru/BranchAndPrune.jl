@@ -1,27 +1,21 @@
 using BranchAndPrune
 
-struct Interval
-    lo::Float64
-    hi::Float64
-end
-
-function process(f, interval, tol = 1e-8)
-    ylo = f(interval.lo)
-    yhi = f(interval.hi)
-
-    # If both have the same sign they are on the same side of the zero
-    if ylo*yhi > 0
-        return :prune, interval
-    elseif interval.hi - interval.lo < tol
-        return :store, interval
+function process(f, (a, b), tol = 1e-8)
+    ya = f(a)
+    yb = f(b)
+    # If both have the same sign their product is positive
+    if ya * yb > 0
+        return :prune, (a, b)
+    elseif b - a < tol
+        return :store, (a, b)
     else
-        return :branch, interval
+        return :branch, (a, b)
     end
 end
 
-function bisect(interval)
-    m = (interval.hi + interval.lo)/2
-    return Interval(interval.lo, m), Interval(m, interval.hi)
+function bisect((a, b))
+    m = (a + b)/2  # The midpoint
+    return (a, m), (m, b)
 end
 
 function find_zero(f, interval)
@@ -29,5 +23,5 @@ function find_zero(f, interval)
     return bpsearch(search)
 end
 
-find_zero(x -> x/3 + 5, Interval(-20, 20))  # Exact solution is -15
-find_zero(x -> (x - 4)^3 - 8, Interval(-20, 20))  # Exact solution is 6
+find_zero(x -> x/3 + 5, (-20.0, 20.0))  # Exact solution is -15
+find_zero(x -> (x - 4)^3 - 8, (-20.0, 20.0))  # Exact solution is 6
