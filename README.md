@@ -55,7 +55,9 @@ function bisect((a, b))
 end
 ```
 
-Finally we search, by defining the the function of interest, the search and then performing it with `bpsearch`.
+Note the difference between `process` and `bisect`. `bisect` only act on the search regions, independantly of the problem we are trying to solve, while `process` is responsible for everything related to actually solving the problem (by looking at the behavior of `f` in the example).
+
+Finally we perform the search, by defining the function of interest and the search object, and passing it to `bpsearch`.
 
 ```jl
 f(x) = x/3 + 5  # Exact solution is -15
