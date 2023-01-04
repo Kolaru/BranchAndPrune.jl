@@ -1,7 +1,7 @@
 using BranchAndPrune
+using AbstractTrees
 using Test
 
-import BranchAndPrune: BPNode, BPTree, MissingImplementationError
-import BranchAndPrune: discard_leaf!, newid, root
+import BranchAndPrune: BPNode, squash_node!, prune!
 
 include("tree.jl")

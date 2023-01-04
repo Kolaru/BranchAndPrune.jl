@@ -20,10 +20,26 @@ mutable struct BPNode{REGION}
 end
 
 function BPNode(status, region, parent, side)
-    BPNode(status, region, parent, side == :left, nothing, nothing)
+    node = BPNode(status, region, parent, side == :left, nothing, nothing)
+    if !isnothing(parent)
+        parent[side] = node
+    end
+    return node
 end
 
-Base.show(io::IO, ::MIME"text/plain", tree::BPNode) = print_tree(io, tree) 
+Base.show(io::IO, ::MIME"text/plain", tree::BPNode) = print_tree(io, tree)
+function Base.getindex(node::BPNode, side::Symbol)
+    side == :left && return node.left_child
+    side == :right && return node.right_child
+    throw(ArgumentError("BPNOde can only be indexed with :left or :right"))
+end
+
+function Base.setindex!(node::BPNode, child::BPNode, side::Symbol)
+    side == :left && return (node.left_child = child)
+    side == :right && return (node.right_child = child)
+    throw(ArgumentError("BPNOde can only be indexed with :left or :right"))
+end
+
 
 """
     prune!(node::BPNOde ; squash = true)

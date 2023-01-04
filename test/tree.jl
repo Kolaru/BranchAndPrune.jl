@@ -1,39 +1,3 @@
-@testset "Trivial tree" begin
-    #= Manually create a simple tree with the following structure
-
-        (1)
-         |
-        (2)
-    =#
-    leaf = BPLeaf("I'm a leaf", 1, :final)
-    node = BPNode(0, [2])
-    tree = BPTree(Dict(1 => node),
-                  Dict(2 => leaf),
-                  [2])
-
-    # Check that printing does not error
-    io = IOBuffer()
-    println(io, leaf)
-    println(io, node)
-    println(io, tree)
-
-    @test root(tree) == node
-    @test nnodes(tree) == 2
-
-    d = data(tree)
-    @test length(d) == 1
-    @test d[1] == "I'm a leaf"
-
-    k = newid(tree)
-    @test k ∉ 0:2  # The new ID must be new and not 0
-    @test isa(k, Integer)
-
-    discard_leaf!(tree, 2)
-    # The last leaf was deleted so the tree should be empty
-    @test nnodes(tree) == 0
-end
-
-
 @testset "Simple tree" begin
     #= Tests on a slighty less trivial tree
 
@@ -46,38 +10,36 @@ end
     (4) (6) (7)  (10)
     =#
 
-    n1 = BPNode(0, [2, 8])
-    n2 = BPNode(1, [3, 5])
-    n3 = BPNode(2, [4])
-    n4 = BPLeaf("Leaf 4", 3, :working)
-    n5 = BPNode(2, [6, 7])
-    n6 = BPLeaf("Leaf 6", 5, :final)
-    n7 = BPLeaf("Leaf 7", 5, :working)
-    n8 = BPNode(1, [9])
-    n9 = BPNode(8, [10])
-    n10 = BPLeaf("Leaf 10", 9, :working)
-
-    tree = BPTree(Dict(1 => n1, 2 => n2, 3 => n3, 5 => n5, 8 => n8, 9 => n9),
-                  Dict(4 => n4, 6 => n6, 7 => n7, 10 => n10),
-                  [3, 4, 8])
+    root = BPNode(:branching, 1, nothing, :left)
+    n2 = BPNode(:branching, 2, root, :left)
+    n3 = BPNode(:branching, 3, n2, :left)
+    n4 = BPNode(:final, 4, n3, :left)
+    n5 = BPNode(:branching, 5, n2, :right)
+    n6 = BPNode(:final, 6, n5, :left)
+    n7 = BPNode(:final, 7, n5, :right)
+    n8 = BPNode(:branching, 8, root, :right)
+    n9 = BPNode(:branching, 9, n8, :right)
+    n10 = BPNode(:final, 10, n9, :right)
 
     # Check that printing does not error
     io = IOBuffer()
-    println(io, tree)
+    println(io, root)
 
-    @test newid(tree) ∉ 0:10
-    @test length(data(tree)) == 4
+    # Check the tree interface
+    @test length(collect(Leaves(root))) == 4
+    @test length(collect(PreOrderDFS(root))) == 10
 
-    @test nnodes(tree) == 10
+    # Test other functions
+    @test length(children(n5)) == 2
+    @test length(children(n9)) == 1
+    @test length(children(n7)) == 0
 
-    discard_leaf!(tree, 6)
-    @test nnodes(tree) == 9
+    squash_node!(n9)
+    @test n8.right_child === n10
 
-    discard_leaf!(tree, 4)
-    @test nnodes(tree) == 7
-
-    discard_leaf!(tree, 10)
-    @test nnodes(tree) == 4
-
-    @test length(data(tree)) == 1
+    prune!(n7, squash = false)
+    @test length(children(n5)) == 1
+    
+    prune!(n4, squash = true)
+    @test root.left_child === n5
 end
