@@ -1,5 +1,5 @@
-@testset "Simple tree" begin
-    #= Tests on a slighty less trivial tree
+@testset "tree.jl" begin
+    #= Tests on a simple tree
 
           (1)
          /   \

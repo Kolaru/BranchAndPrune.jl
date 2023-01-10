@@ -89,8 +89,8 @@ function Base.iterate(
         node.status = :branching
         node.left_child = BPNode(:working, left_data, node, :left)
         node.right_child = BPNode(:working, right_data, node, :right)
-        push!(search, node.left_child)
         push!(search, node.right_child)
+        push!(search, node.left_child)
     elseif action == :prune
         prune!(node)
     else
