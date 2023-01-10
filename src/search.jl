@@ -1,132 +1,209 @@
 """
-    AbstractSearch{DATA}
+    BranchAndPruneSearch(S, process, bisect, initial_region)
 
-Branch and bound search interface in element of type DATA.
+Branch and prune search, using the search order `S` on the given initial region.
+It works by recursively bisecting the regions of search with `bisect` until
+all regions are found satisfactory according to `process`.
+Build a binary tree relating the regions to each other as the search progress.
 
-This interface provide an iterable that perform the search.
+`process` and `bisect` both take a single region as an argument.
 
-There is currently three types of search supported `BreadFirstAbstractSearch`,
-`AbstractDepthFirstSearch` and `AbstractKeySearch`, each one processing the element of the
-tree in a different order. When subtyping one of these, the following methods
-must be implemented:
-  - `root_element(::AbstractSearch)`: return the element with which the search is started
-  - `process(::AbstractSearch, elem::DATA)`: return a symbol representing the action
-        to perform with the element `elem` and an object of type `DATA` representing
-        the state of the element after processing (may return `elem` unchanged).
-  - `bisect(::AbstractSearch, elem::DATA)`: return two elements of type `DATA` build
-        by bisecting `elem`
+`process` must return an action to perform and the region on which
+to perform it. The possible actions are
+- `:store`: the region is considered as final, is stored, and is not
+    further processed.
+- `:branch`: the element is bisected and each of the two resulting part
+    are processed independently.
+- `:prune`: the element is discarded from the tree.
+    If it is the last descendant of a branch, the whole branch is pruned
+    from the tree.
+    The intermediate nodes with a single descendant are also removed from the tree.
+The initial region can be returned unchanged if no refinement is possible at
+this stage.
 
-Subtyping `AbstractSearch` directly allows to have control over the order in which
-the elements are process. To do this the following methods must be implemented:
-  - `root_element(::AbstractSearch)`: return the first element to be processed. Use
-        to build the initial tree.
-  - `get_leaf_id!(::AbstractSearch, wt::BPTree)`: return the id of the next leaf that
-        will be processed and remove it from the list of working leaves of `wt`.
-  - `insert_leaf!(::AbstractSearch, wt::BPTree, leaf::BPLeaf)`: insert a leaf in the
-        list of working leaves.
+`bisect` is used when a region is marked to be branched.
+It must return two subregions of the original one, and of the same type.
 
-# Valid symbols returned by the process function
-  - `:store`: the element is considered as final and is stored, it will not be
-        further processed
-  - `:bisect`: the element is bisected and each of the two resulting part will
-        be processed
-  - `:discard`: the element is discarded from the tree, allowing to free memory
+`BranchAndPruneSearch` objects are iterable, exhausting the iterable
+performs the full search.
+
+WARNING
+By default, the search only ends when all remaining regions are given the
+directive `:store` by the process function.
+For stopping based on different criterion, either manually break the iteration
+loop or use `bpsearch(search ; callback)` with a custom callback function.
 """
-abstract type AbstractSearch{DATA} end
-
-abstract type AbstractBreadthFirstSearch{DATA} <: AbstractSearch{DATA} end
-abstract type AbstractDepthFirstSearch{DATA} <: AbstractSearch{DATA} end
-
-
-# TODO should be smallest key first to match sort functions
-"""
-    AbstractKeySearch{DATA} <: AbstractSearch{DATA}
-
-Interface to a branch and bound search that use a key function to decide which
-element to process first. The search process first the element with the largest
-key as computed by `keyfunc(ks::AbstractKeySearch, elem)`.
-
-!!! warning
-    Untested.
-"""
-abstract type AbstractKeySearch{DATA} <: AbstractSearch{DATA} end
-
-"""
-    root_element(search::AbstractSearch)
-
-Return the initial element of the search. The `BPTree` will be build around it.
-
-Can be define for custom searches that are direct subtype of `AbstractSearch`, default
-behavior is to fetch the field `initial` of the search.
-"""
-root_element(search::AbstractSearch) = search.initial
-
-"""
-    get_leaf_id!(::AbstractSearch, wt::BPTree)
-
-Return the id of the next leaf that will be processed and remove it from the
-list of working leaves.
-
-Must be define for custom searches that are direct subtype of `AbstractSearch`.
-"""
-get_leaf_id!(::AbstractBreadthFirstSearch, wt::BPTree) = popfirst!(wt.working_leaves)
-get_leaf_id!(::AbstractDepthFirstSearch, wt::BPTree) = pop!(wt.working_leaves)
-get_leaf_id!(::AbstractKeySearch, wt::BPTree) = popfirst!(wt.working_leaves)
-
-"""
-    insert_leaf!(::AbstractSearch, wt::BPTree, leaf::BPLeaf)
-
-Insert the id of a new leaf that has been produced by bisecting an older leaf
-into the list of working leaves.
-
-Must be define for custom searches that are direct subtype of `AbstractSearch`.
-"""
-function insert_leaf!(::Union{AbstractBreadthFirstSearch{DATA}, AbstractDepthFirstSearch{DATA}},
-                      wt::BPTree{DATA}, leaf::BPLeaf{DATA}) where {DATA}
-    id = newid(wt)
-    wt.leaves[id] = leaf
-    push!(wt.working_leaves, id)
-    return id
+struct BranchAndPruneSearch{S, REGION, F, G}
+    process::F
+    bisect::G
+    initial_region::REGION
 end
 
-function insert_leaf!(::KS, wt::BPTree{DATA}, leaf::BPLeaf{DATA}) where {DATA, KS <: AbstractKeySearch{DATA}}
-    id = newid(wt)
-    wt.leaves[id] = leaf
-    keys = keyfunc.(KS, wt.working_leaves)
-    current = keyfunc(KS, leaf)
-
-    # Keep the working_leaves sorted
-    insert!(wt.working_leaves, searchsortedfirst(keys, current), id)
-    return id
+function BranchAndPruneSearch(S, process::F, bisect::G, initial_region::R) where {F, G, R}
+    BranchAndPruneSearch{S, R, F, G}(process, bisect, initial_region)
 end
 
-eltype(::Type{BPS}) where {DATA, BPS <: AbstractSearch{DATA}} = BPTree{DATA}
-IteratorSize(::Type{BPS}) where {BPS <: AbstractSearch} = Base.SizeUnknown()
+Base.eltype(::Type{BPS}) where {S, REGION, BPS <: BranchAndPruneSearch{S, REGION}} = SearchState{S, REGION}
+Base.IteratorSize(::Type{BPS}) where {BPS <: BranchAndPruneSearch} = Base.SizeUnknown()
 
-function iterate(search::AbstractSearch{DATA},
-                 wt::BPTree=BPTree(root_element(search))) where {DATA}
+"""
+    SearchState{S, REGION}
 
-    isempty(wt.working_leaves) && return nothing
+State of a search by branch and prune.
 
-    id = get_leaf_id!(search, wt)
-    X = wt.leaves[id]
-    action, newdata = process(search, data(X))
+Field
+=====
+- `search_order``::SearchOrder : The order in which the search is performed.
+    Contains information about the state of the search.
+    See `SearchOrder` for more details.
+- `tree`::BPNode{REGION} : The current binary tree representing the search.
+- `iteration`::Int
+"""
+struct SearchState{S, REGION}
+    search_order::S
+    tree::BPNode{REGION}
+    iteration::Int
+end
+
+function SearchState(S, initial_region::REGION) where REGION
+    root = BPNode(:working, initial_region, nothing, :left)
+    return SearchState(S(root), root, 1)
+end
+
+function Base.iterate(
+        bp::BranchAndPruneSearch{S},
+        state = SearchState(S, bp.initial_region)) where S
+
+    search = state.search_order
+
+    node = pop!(search)
+    isnothing(node) && return nothing
+
+    action, region = bp.process(node.region)
     if action == :store
-        wt.leaves[id] = BPLeaf(newdata, X.parent, :final)
-    elseif action == :bisect
-        child1, child2 = bisect(search, newdata)
-        leaf1 = BPLeaf(child1, id, :working)
-        leaf2 = BPLeaf(child2, id, :working)
-        id1 = insert_leaf!(search, wt, leaf1)
-        id2 = insert_leaf!(search, wt, leaf2)
-        wt.nodes[id] = BPNode(X, id1, id2)
-        delete!(wt.leaves, id)
-    elseif action == :discard
-        discard_leaf!(wt, id)
+        node.region = region
+        node.status = :final
+    elseif action == :branch
+        left_data, right_data = bp.bisect(region)
+        node.region = nothing
+        node.status = :branching
+        node.left_child = BPNode(:working, left_data, node, :left)
+        node.right_child = BPNode(:working, right_data, node, :right)
+        push!(search, node.right_child)
+        push!(search, node.left_child)
+    elseif action == :prune
+        prune!(node)
     else
-        error("Branch and bound: process function of the search object return " *
-              "unknown action: $action for element $X. Valid actions are " *
-              ":store, :bisect and :discard.")
+        error("process function for the search return " *
+              "unknown action :$action for region of type $(typeof(region)). " *
+              "Valid actions are :store, :branch and :prune.")
     end
-    return wt, wt
+
+    new_state = SearchState(
+        state.search_order,
+        state.tree,
+        state.iteration + 1
+    )
+    return new_state, new_state
+end
+
+"""
+    BranchAndPruneResult
+
+Type representing the result of a branch and prune search.
+
+Fields
+======
+- `search_order::SearchOrder`
+- `initial_region`
+- `tree::BPNode`: Root of the search tree constructed during the search.
+- `final_regions`: Vector of all the regions that have been labelled with `:store`
+    during the search.
+- `unfinished_regions`: Vector of all the regions that have been produced by
+    bisection but never processed.
+    Non empty only if the search is stopped early.
+- `converged::Bool`: Whether the search has run up to the end.
+"""
+struct BranchAndPruneResult{S, REGION}
+    search_order::S
+    initial_region::REGION
+    tree::BPNode{REGION}
+    final_regions::Vector{REGION}
+    unfinished_regions::Vector{REGION}
+    converged::Bool
+end
+
+function BranchAndPruneResult(
+        search_order,
+        initial_region::REGION,
+        tree::BPNode{REGION}) where REGION
+    
+    final_regions = REGION[leaf.region for leaf in Leaves(tree) if leaf.status == :final]
+    unfinished_regions = REGION[leaf.region for leaf in Leaves(tree) if leaf.status == :working]
+
+    return BranchAndPruneResult(
+        search_order,
+        initial_region,
+        tree,
+        final_regions,
+        unfinished_regions,
+        isempty(unfinished_regions)
+    )
+end
+
+function padded_string(val  ; padding = 1, skip = 0)
+    buffer = IOBuffer()
+    show(buffer, MIME"text/plain"(), val)
+    s = String(take!(buffer))
+    pad = " "^padding
+    lines = split(s, "\n")[1 + skip:end]
+    return pad * join(lines, "\n" * pad)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", res::BranchAndPruneResult)
+    ctx = IOContext(io, :compact => true)
+    println(io, "BranchAndPruneResult")
+    println(io, " converged: $(res.converged)")
+    print(io, " initial region: ")
+    show(ctx, MIME"text/plain"(), res.initial_region)
+    println(io)
+    println(io, " final regions:\n", padded_string(res.final_regions ; skip = 1))
+    if !res.converged
+        println(io, " unfinished regions:\n", padded_string(res.unfinished_regions ; skip = 1))
+    end
+end
+
+"""
+    bpsearch(bp::BranchAndPruneSearch ; callback::Function)
+
+Perform a branch and prune search and return its result as a BranchAndPruneResult.
+
+A callback function can be given, which is called on the search state
+at every iteration.
+It must have signature `callback(state::SearchState)::Bool`.
+If it return `true` the searched is stopped and return.
+"""
+function bpsearch(
+        bp::BranchAndPruneSearch ;
+        callback = (state -> false))
+    endstate = nothing
+
+    for state in bp
+        endstate = state
+        callback(state) && break
+    end
+
+    tree = endstate.tree
+
+    # Remove the root node if it has a single child
+    if length(children(tree)) == 1
+        tree = only(children(tree))
+        tree.parent = nothing
+    end
+
+    return BranchAndPruneResult(
+        endstate.search_order,
+        bp.initial_region,
+        tree
+    )
 end

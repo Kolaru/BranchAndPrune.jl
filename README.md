@@ -10,116 +10,139 @@ A branch and prune algorithm has the following general structure:
 2. Determine status of this search region, with three possible outcomes:
    1. The region does not contain anything of interest. In this case discard the region (*prune* it).
    2. The region is in a state that does not require further processing (for example a given tolerance has been met). In this case it is stored.
-   3. None of the above. In this case, the region is bisected (or multisected) and each of the subregions created is added to the pool of regions to be considered (creating new *branches* for the search).
+   3. None of the above. In this case, the region is bisected and each of the subregions created is added to the pool of regions to be considered (creating new *branches* for the search).
 3. Go back to 1.
 
-Some examples, like a naive implementation of the bisection method for zero finding, can be found in the `example` folder.
-
-Also this was developped to meet the need of the [`IntervalRootFinding.jl`](https://github.com/JuliaIntervals/IntervalRootFinding.jl) package, and as such it constitutes a more complex and concrete example of possible usage.
+Also this was developped to meet the need of the [`IntervalRootFinding.jl`](https://github.com/JuliaIntervals/IntervalRootFinding.jl) package, and as such it constitutes a concrete example of possible usage.
 
 
-## Usage
+## Usage example
 
-### Subtyping searches with concrete strategy
+As an example we are looking for zero of monotonic functions, `f(x) = 0`.
 
-The package defines three search strategies: breadth first, depth first and key search (i.e. a key is computed for each region and the region with the smallest key is processed first). These only determine in which order search regions are considered, but nothing more. In consequence, concrete search types must implement two things:
+We work with tuple of numbers `(a, b)` to represent intervals.
 
-1. `BranchAndPrune.process` that determines the status of a search region, and
-2. `BranchAndPrune.bisect` that bisect a search region.
+First we define the `process` function. The logic is as follow
+- if the image of both side of the interval have the same sign, then the interval does not contain a solution (since `f` is monotonic) and we discard the interval.
+- if the size of the interval is small enough, we store it.
+- otherwise, we bisect it.
 
-To make things a bit clearer, we now show how to implement a simple bisection search for the zero of a continuous monotonic function (full implementation is available in `example/monotonic_zero.jl`).
-
-First to be able to store search region we define an interval type
+In all cases, we do not modify the interval when processing it.
 
 ```jl
-struct Interval
-    lo::Float64
-    hi::Float64
-end
-```
+using BranchAndPrune
 
-Then we need to create our own search type. Our search type contains the function whose zero is searched, an initial search region and an absolute tolerance to be used as stopping criterion.
-
-```jl
-struct ZeroSearch <: AbstractDepthFirstSearch{Interval}
-    f::Function
-    initial::Interval
-    tol::Float64
-end
-```
-
-We have subtyped the `AbstractDepthFirstSearch` which means that the first regions created will be considered first (first in first out). Also the abstract type takes the type of the search region as type parameter for efficiency reasons.
-
-Note that by default, the initial search region is assumed to be the field `initial` of the type. This can however be customized by redifining the function `BranchAndPrune.root_element`.
-
-To be able to perform the search, as mentioned above, we need to implement how search regions are handled. The `process` function should determine the status of an interval as follows:
-
-1. If both bounds of the interval have the same sign, then the interval cannot contain zero and should be discarded.
-2. If the radius of the interval is smaller than the tolerance, the interval should not be processed further, but instead stored.
-3. Otherwise, we bisect the interval.
-
-Concretely this reads
-
-```jl
-function BranchAndPrune.process(search::ZeroSearch, interval)
-    ylo = search.f(interval.lo)
-    yhi = search.f(interval.hi)
-
-    if ylo*yhi > 0
-        return :discard, interval
-    elseif interval.hi - interval.lo < search.tol
-        return :store, interval
+function process(f, (a, b), tol = 1e-8)
+    ya = f(a)
+    yb = f(b)
+    # If both have the same sign their product is positive
+    if ya * yb > 0
+        return :prune, (a, b)
+    elseif b - a < tol
+        return :store, (a, b)
     else
-        return :bisect, interval
+        return :branch, (a, b)
     end
 end
 ```
 
-Note the use of the symbols `:discard`, `:store` and `:bisect`. They determine the status of the search region and are the three only possible ones. There is also a second returned value, here always the interval considered without modification. In principle it could be a refinement of the search region as it replaces the initial one in the search.
-
-Then we need to be able to bisect an interval, this can be done as follows
+Then we define how an interval is bisected.
 
 ```jl
-function BranchAndPrune.bisect(::ZeroSearch, interval)
-    m = (interval.hi + interval.lo)/2
-    return Interval(interval.lo, m), Interval(m, interval.hi)
+function bisect((a, b))
+    m = (a + b)/2  # The midpoint
+    return (a, m), (m, b)
 end
 ```
 
-We can now write a function to run the search given a function `f` and an initial interval
+Note the difference between `process` and `bisect`. `bisect` only act on the search regions, independantly of the problem we are trying to solve, while `process` is responsible for everything related to actually solving the problem (by looking at the behavior of `f` in the example).
+
+Finally we perform the search, by defining the function of interest and the search object, and passing it to `bpsearch`.
 
 ```jl
-function run_search(f, interval)
-    search = ZeroSearch(f, interval, 1e-10)
-
-    local endtree = nothing
-
-    for working_tree in search
-        endtree = working_tree
-    end
-
-    return endtree
-end
+f(x) = x/3 + 5  # Exact solution is -15
+search = BranchAndPruneSearch(BreadthFirst, X -> process(f, X), bisect, (-30.0, 20.0))
+bpsearch(search)
 ```
 
-Several things are important here. First the search object is an iterator, to get the result it is thus necessary to iterate over it, for example with the `for` loop presented here. This means that some operations, like printing debug info, can be done at each iterations.
+Returning a correct enclosure of the solution
 
-This also explains the need for the `local` keyword when initializing `endtree` this allows to extract the state from the `for` loop. Otherwise, the variable `endtree` would be shadowed inside the loop and the internal state could not be retrieved.
+```
+BranchAndPruneResult
+ converged: true
+ initial region: (-30.0, 20.0)
+ final regions:
+  (-15.00000000349246, -14.999999997671694)
+```
 
-Finally the states of the search during the iteration, as well as the final state, are represented as a *tree* (of type `BPTree`). This closely matches the structure of the search as each bisection can be seen as creating a new branch in a binary tree.
-
-Finally, the `data` function allows to get a list of all surviving search regions at the end of the search
+Using a callback it is possible to stop the iteration early
 
 ```jl
-tree = run_search(x -> (x - 4)^3 - 8, Interval(-20, 20))
-d = data(tree)
+sol = bpsearch(search ; callback = state -> state.iteration >= 10)
 ```
 
-Here `d` contains only one element, an interval that indeed well approximates the exact solution which is `6`. If the function had no zero, `d` would be empty.
+In this case no region hit the finalized state, and the search is considered unconverged.
+
+```jl
+julia> sol = bpsearch(search ; callback = state -> state.iteration >= 25)
+BranchAndPruneResult
+ converged: false
+ initial region: (-30.0, 20.0)
+ final regions:
+
+ unfinished regions:
+  (-15.009765625, -15.003662109375)
+  (-15.003662109375, -14.99755859375)
+  (-14.99755859375, -14.9853515625)
+```
+
+The tree representing the current state of the search can be examined.
+
+```jl
+julia> sol.tree
+Branching
+├─ Branching
+│  ├─ (:working, (-15.009765625, -15.003662109375))
+│  └─ (:working, (-15.003662109375, -14.99755859375))
+└─ (:working, (-14.99755859375, -14.9853515625))
+```
+
+Using a `DepthFirstSearch` order instead, we see a different intermediate result and tree.
+As expected, using a depth first search produces a much deeper tree.
+
+```jl
+julia> search = BranchAndPruneSearch(DepthFirst, X -> process(f, X), bisect, (-30.0, 20.0))
+BranchAndPruneSearch{DepthFirst, Tuple{Float64, Float64}, var"#91#92", typeof(bisect)}(var"#91#92"(), bisect, (-30.0, 20.0))
+
+julia> sol = bpsearch(search ; callback = state -> state.iteration >= 25)
+BranchAndPruneResult
+ converged: false
+ initial region: (-30.0, 20.0)
+ final regions:
+
+ unfinished regions:
+  (-30.0, -17.5)
+  (-17.5, -15.9375)
+  (-15.9375, -15.15625)
+  (-15.15625, -15.05859375)
+  (-15.05859375, -15.009765625)
+  (-15.009765625, -15.003662109375)
+  (-15.003662109375, -15.0006103515625)
+  (-15.0006103515625, -14.999847412109375)
+  (-14.999847412109375, -14.99908447265625)
 
 
-### Search with custom strategy
-
-The order in which search regions are considered can be customized by subtyping `AbstractSearch` directly and defining `BranchAndPrune.get_leaf_id!` and `BranchAndPrune.insert_leaf!` for the new type. This however requires some unerstanding of the internal tree structure.
-
-Please refer to the docstrings and source code for more information, and don't hesitate to open an issue for information or clarifications.
+julia> sol.tree
+Branching
+├─ (:working, (-30.0, -17.5))
+└─ Branching
+   ├─ (:working, (-17.5, -15.9375))
+   └─ Branching
+      ├─ (:working, (-15.9375, -15.15625))
+      └─ Branching
+         ├─ (:working, (-15.15625, -15.05859375))
+         └─ Branching
+            ├─ (:working, (-15.05859375, -15.009765625))
+            └─ Branching
+               ⋮
+```

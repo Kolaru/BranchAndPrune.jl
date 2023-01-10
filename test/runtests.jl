@@ -1,8 +1,9 @@
 using BranchAndPrune
+using AbstractTrees
 using Test
 
-import BranchAndPrune: BPLeaf, BPNode, BPTree, MissingImplementationError
-import BranchAndPrune: discard_leaf!, newid, root
+import BranchAndPrune: BPNode, squash_node!, prune!
 
 include("tree.jl")
-include("interface.jl")
+include("search_order.jl")
+include("search.jl")

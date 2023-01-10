@@ -1,187 +1,116 @@
-abstract type AbstractBPNode end
-
 """
-    BPNode <: AbstractBPNode
+    BPNode(status, region, parent, is_left_child, left_child, right_child)
 
-Intermediate node of a `BPTree`. Does not contain any data by itself,
-only redirect toward its children.
-"""
-struct BPNode <: AbstractBPNode
-    parent::Int
-    children::Vector{Int}
-end
+Node of a binary tree designed for branch and prune search.
+It represents a search region and its status.
 
+Its status is one of
+- `:working`: for a leaf that need further processing.
+- `:final`: for a leaf in its final state.
+- `:branching`: for an intermediate node. In this case the data about the
+    represented region is not stored in the node, but in its descendents.
 """
-    BPLeaf{DATA} <: AbstractBPLeaf
-
-Leaf node of a `BPTree` that contains some data. Its status is either
-  - `:working`: the leaf will be further processed.
-  - `:final`: the leaf won't be touched anymore.
-"""
-struct BPLeaf{DATA} <: AbstractBPNode
-    data::DATA
-    parent::Int
+mutable struct BPNode{REGION}
     status::Symbol
+    region::Union{Nothing, REGION}
+    parent::Union{Nothing, BPNode{REGION}}
+    is_left_child::Bool
+    left_child::Union{Nothing, BPNode{REGION}}
+    right_child::Union{Nothing, BPNode{REGION}}
 end
 
-function BPLeaf(data::DATA, parent::Int) where {DATA}
-    BPLeaf{DATA}(data, parent, :working)
-end
-
-function BPNode(leaf::BPLeaf, child1::Int, child2::Int)
-    BPNode(leaf.parent, Int[child1, child2])
-end
-
-"""
-    BPTree{DATA}
-
-Tree storing the data used and produced by a branch and bound search in a
-structured way.
-
-Nodes and leaves can be accessed using their index using the bracket syntax
-`wt[node_id]`. However this is slow, as nodes and leaves are stored separately.
-
-Support the iterator interface. The element yielded by the iteration are
-tuples `(node_id, lvl)` where `lvl` is the depth of the node in the tree.
-"""
-struct BPTree{DATA}
-    nodes::Dict{Int, BPNode}
-    leaves::Dict{Int, BPLeaf{DATA}}
-    working_leaves::Vector{Int}
-end
-
-function BPTree(rootdata::DATA) where {DATA}
-    rootleaf = BPLeaf(rootdata, 0)
-    BPTree{DATA}(Dict{Int, BPNode}(), Dict(1 => rootleaf), Int[1])
-end
-
-show(io::IO, wn::BPNode) = print(io, "Node with children $(wn.children)")
-
-function show(io::IO, wl::BPLeaf)
-    print(io, "Leaf (:$(wl.status)) with data $(wl.data)")
-end
-
-function show(io::IO, wt::BPTree{DATA}) where {DATA}
-    println(io, "Working tree with $(nnodes(wt)) elements of type $DATA")
-
-    if nnodes(wt) > 0
-        println(io, "Indices: ", vcat(collect(keys(wt.nodes)), collect(keys(wt.leaves))) |> sort)
-        println(io, "Structure:")
-        for (id, lvl) in wt
-            println(io, "  "^lvl * "[$id] $(wt[id])")
-        end
+function BPNode(status, region, parent, side)
+    node = BPNode(status, region, parent, side == :left, nothing, nothing)
+    if !isnothing(parent)
+        parent[side] = node
     end
+    return node
 end
 
-# Root node has id 1 and parent id 0
-root(wt::BPTree) = wt[1]
-is_root(wt::BPTree, id::Int) = (id == 1)
+Base.show(io::IO, ::MIME"text/plain", tree::BPNode) = print_tree(io, tree)
+function Base.getindex(node::BPNode, side::Symbol)
+    side == :left && return node.left_child
+    side == :right && return node.right_child
+    throw(ArgumentError("BPNOde can only be indexed with :left or :right"))
+end
+
+function Base.setindex!(node::BPNode, child::BPNode, side::Symbol)
+    side == :left && return (node.left_child = child)
+    side == :right && return (node.right_child = child)
+    throw(ArgumentError("BPNOde can only be indexed with :left or :right"))
+end
+
 
 """
-    nnodes(wt::BPTree)
+    prune!(node::BPNOde ; squash = true)
 
-Number of nodes (including leaves) in a `BPTree`.
+Remove the node from the tree, and recursively all branching nodes
+that are left without descendant.
+
+If `squash` is true, modify the tree to skip intermediate branching node
+with a single descendant.
 """
-nnodes(wt::BPTree) = length(wt.nodes) + length(wt.leaves)
+function prune!(node::BPNode ; squash = true)
+    parent = node.parent
 
-"""
-    data(leaf::BPLeaf)
+    if isnothing(parent)
+        node.region = nothing
+        node.status = :empty
+        node.left_child = nothing
+        node.right_child = nothing
+    end
 
-Return the data stored in the leaf.
-"""
-data(leaf::BPLeaf) = leaf.data
-
-"""
-    data(wt::BPTree)
-
-Return all the data stored in a `BPTree` as a list. The ordering of the elements
-is arbitrary.
-"""
-data(wt::BPTree) = data.(values(wt.leaves))
-
-function newid(wt::BPTree)
-    k1 = keys(wt.nodes)
-    k2 = keys(wt.leaves)
-
-    if length(k1) > 0
-        m1 = maximum(k1)
+    if node.is_left_child
+        isnothing(parent.right_child) && return prune!(parent)
+        parent.left_child = nothing
     else
-        m1 = 0
+        isnothing(parent.left_child) && return prune!(parent)
+        parent.right_child = nothing
     end
+    squash && return squash_node!(parent)
+end
 
-    if length(k2) > 0
-        m2 = maximum(k2)
+squash_node!(::Nothing) = nothing
+
+function squash_node!(node::BPNode)
+    parent = node.parent
+    isnothing(parent) && return
+    child = only(children(node))
+
+    if node.is_left_child
+        parent.left_child = child
+        child.is_left_child = true
+        child.parent = parent
     else
-        m2 = 0
+        parent.right_child = child
+        child.is_left_child = false
+        child.parent = parent
     end
-
-    return max(m1, m2) + 1
 end
 
-# Index operations (slower than manipulating the node directly in the correct
-# dictionary)
-function getindex(wt::BPTree, id)
-    haskey(wt.nodes, id) && return wt.nodes[id]
-    haskey(wt.leaves, id) && return wt.leaves[id]
-    error("getindex failed: no index $id")  # TODO: make better error
-end
-
-setindex!(wt::BPTree, val::BPNode, id) = setindex!(wt.nodes, val, id)
-setindex!(wt::BPTree, val::BPLeaf, id) = setindex!(wt.leaves, val, id)
-
-function delete!(wt::BPTree, id)
-    if haskey(wt.nodes, id)
-        delete!(wt.nodes, id)
-    elseif haskey(wt.leaves, id)
-        delete!(wt.leaves, id)
+# AbstractTree.jl API
+function AbstractTrees.children(node::BPNode{REGION}) where REGION
+    if isnothing(node.left_child)
+        isnothing(node.right_child) && return BPNode{REGION}[]
+        return [node.right_child]
     else
-        error("delete! failed: no index $id")  # TODO: make better error
+        isnothing(node.right_child) && return [node.left_child]
+        return [node.left_child, node.right_child]
     end
 end
 
-"""
-    discard_leaf!(wt::BPTree, id::Int)
+AbstractTrees.nodevalue(node::BPNode) = (node.status, node.region)
 
-Delete the `BPLeaf` with index `id` and all its ancestors to which it is
-the last descendant.
-"""
-function discard_leaf!(wt::BPTree, id::Int)
-    leaf = wt.leaves[id]
-    delete!(wt.leaves, id)
-    recursively_delete_parent!(wt, leaf.parent, id)
-end
+AbstractTrees.ParentLinks(::Type{<:BPNode}) = StoredParents()
+AbstractTrees.parent(node::BPNode) = node.parent
 
-function recursively_delete_parent!(wt, id_parent, id_child)
-    if !is_root(wt, id_child)
-        parent = wt.nodes[id_parent]
-        siblings = parent.children
-        if length(parent.children) == 1  # The child has no siblings, so delete the parent
-            delete!(wt.nodes, id_parent)
-            recursively_delete_parent!(wt, parent.parent, id_parent)
-        else  # The child has siblings so remove it from the children list
-            deleteat!(parent.children, searchsortedfirst(parent.children, id_child))
-        end
+AbstractTrees.NodeType(::Type{<:BPNode}) = HasNodeType()
+AbstractTrees.nodetype(::Type{T}) where {T <: BPNode} = T
+
+function AbstractTrees.printnode(io::IO, node::BPNode)
+    if node.status == :branching
+        print(io, "Branching")
+    else
+        print(io, nodevalue(node))
     end
-end
-
-function iterate(wt::BPTree, (id, lvl)=(0, 0))
-    id, lvl = next_id(wt, id, lvl)
-    lvl == 0 && return nothing
-    return (id, lvl), (id, lvl)
-end
-
-function next_id(wt::BPTree, id, lvl)
-    lvl == 0 && return (1, 1)
-    node = wt[id]
-    isa(node, BPNode) && return (node.children[1], lvl + 1)
-    return next_sibling(wt, id, lvl)
-end
-
-function next_sibling(wt::BPTree, sibling, lvl)
-    parent = wt[sibling].parent
-    parent == 0 && return (0, 0)
-    children = wt[parent].children
-    maximum(children) == sibling && return next_sibling(wt, parent, lvl - 1)
-    id = minimum(filter(x -> x > sibling, children))
-    return (id, lvl)
 end

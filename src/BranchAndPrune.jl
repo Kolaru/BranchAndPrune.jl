@@ -1,14 +1,12 @@
 module BranchAndPrune
 
-import Base: copy, eltype, iterate, IteratorSize, show
-import Base: getindex, setindex!, delete!
+using AbstractTrees
 
-export AbstractSearch, AbstractBreadthFirstSearch, AbstractDepthFirstSearch
-export data
-export copy, eltype, iterate, IteratorSize, nnodes
+export BranchAndPruneSearch, bpsearch
+export BreadthFirst, DepthFirst
 
 include("tree.jl")
+include("search_order.jl")
 include("search.jl")
-include("forced_definitions.jl")
 
 end  # module
