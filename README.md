@@ -107,7 +107,7 @@ Branching
 └─ (:working, (-14.99755859375, -14.9853515625))
 ```
 
-Using a `DepthFirstSearch` order instead, we see a different intermediate result and tree.
+Using a `DepthFirst` order instead, we see a different intermediate result and tree.
 As expected, using a depth first search produces a much deeper tree.
 
 ```jl

@@ -58,6 +58,7 @@ function prune!(node::BPNode ; squash = true)
         node.status = :empty
         node.left_child = nothing
         node.right_child = nothing
+        return
     end
 
     if node.is_left_child
