@@ -3,7 +3,7 @@ module BranchAndPrune
 using AbstractTrees
 
 export BranchAndPruneSearch, bpsearch
-export BreadthFirst, DepthFirst
+export SearchOrder, BreadthFirst, DepthFirst
 
 include("tree.jl")
 include("search_order.jl")
