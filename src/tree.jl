@@ -27,7 +27,12 @@ function BPNode(status, region, parent, side)
     return node
 end
 
-Base.show(io::IO, ::MIME"text/plain", tree::BPNode) = print_tree(io, tree)
+function Base.show(io::IO, node::BPNode)
+    print(io, "BPNode($(node.status), $(node.region))")
+end
+
+Base.show(io::IO, ::MIME"text/plain", node::BPNode) = print_tree(io, node)
+
 function Base.getindex(node::BPNode, side::Symbol)
     side == :left && return node.left_child
     side == :right && return node.right_child

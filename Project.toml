@@ -1,7 +1,7 @@
 name = "BranchAndPrune"
 uuid = "d3bc4f2e-91e6-11e9-365e-cd067da536ce"
 authors = ["Benoît Richard <kolaru@hotmail.com>"]
-version = "0.2.1"
+version = "0.2.2"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
