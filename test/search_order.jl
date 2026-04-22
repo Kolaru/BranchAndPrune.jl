@@ -29,4 +29,10 @@
     @test pop!(breadth_first) == n4
     @test pop!(breadth_first) == n3
     @test isnothing(pop!(breadth_first))
+
+    changing = ChangingOrder(n5)
+    push!(changing, n4)
+    push!(changing, n3)
+    set_next!(changing, 2)
+    @test pop!(changing) == n4
 end

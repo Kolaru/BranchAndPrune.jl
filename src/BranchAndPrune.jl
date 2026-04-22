@@ -4,6 +4,7 @@ using AbstractTrees
 
 export BranchAndPruneSearch, bpsearch
 export SearchOrder, BreadthFirst, DepthFirst, ChangingOrder
+export push!, pop!, set_next!
 
 include("tree.jl")
 include("search_order.jl")

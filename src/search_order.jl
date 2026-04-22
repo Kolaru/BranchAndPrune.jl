@@ -33,6 +33,7 @@ mutable struct ChangingOrder{REGION} <: SearchOrder
 end
 
 ChangingOrder(root::BPNode) = ChangingOrder([root], 1)
+set_next!(so::ChangingOrder, i::Int) = (so.next = i)
 
 """
     pop!(::SearchOrder)
