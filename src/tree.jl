@@ -45,7 +45,6 @@ function Base.setindex!(node::BPNode, child::BPNode, side::Symbol)
     throw(ArgumentError("BPNOde can only be indexed with :left or :right"))
 end
 
-
 """
     prune!(node::BPNOde ; squash = true)
 
@@ -93,6 +92,10 @@ function squash_node!(node::BPNode)
         child.parent = parent
     end
 end
+
+regions(tree::BPNode) = vcat(unfinished_regions(tree), finished_regions(tree))
+finished_regions(tree::BPNode{REGION}) where REGION = REGION[leaf.region for leaf in Leaves(tree) if leaf.status == :final]
+unfinished_regions(tree::BPNode{REGION}) where REGION = REGION[leaf.region for leaf in Leaves(tree) if leaf.status == :working]
 
 # AbstractTree.jl API
 function AbstractTrees.children(node::BPNode{REGION}) where REGION

@@ -2,12 +2,14 @@ module BranchAndPrune
 
 using AbstractTrees
 
-export BranchAndPruneSearch, bpsearch
+include("tree.jl")
+export regions, finished_regions, unfinished_regions
+
+include("search_order.jl")
 export SearchOrder, BreadthFirst, DepthFirst, ChangingOrder
 export push!, pop!, set_next!
 
-include("tree.jl")
-include("search_order.jl")
 include("search.jl")
+export BranchAndPruneSearch, SearchState, BranchAndPruneResult, bpsearch
 
 end  # module
