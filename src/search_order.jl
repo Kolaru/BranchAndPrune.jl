@@ -27,6 +27,14 @@ end
 
 BreadthFirst(root::BPNode) = BreadthFirst([root])
 
+mutable struct ChangingOrder{REGION} <: SearchOrder
+    working_leaves::Vector{BPNode{REGION}}
+    next::Int 
+end
+
+ChangingOrder(root::BPNode) = ChangingOrder([root], 1)
+set_next!(so::ChangingOrder, i::Int) = (so.next = i)
+
 """
     pop!(::SearchOrder)
 
@@ -40,6 +48,13 @@ Must be define for custom search orders.
 """
 Base.pop!(so::BreadthFirst) = isempty(so.working_leaves) ? nothing : popfirst!(so.working_leaves)
 Base.pop!(so::DepthFirst) = isempty(so.working_leaves) ? nothing : pop!(so.working_leaves)
+function Base.pop!(so::ChangingOrder)
+    isempty(so.working_leaves) && return nothing
+    next = so.working_leaves[so.next]
+    deleteat!(so.working_leaves, so.next)
+    so.next = 1
+    return next
+end 
 
 """
     push!(::SearchOrder, leaf::BPNode)
@@ -50,4 +65,4 @@ Can modify the internal state of the SearchOrder.
 
 Must be define for custom search orders.
 """
-Base.push!(so::Union{DepthFirst, BreadthFirst}, leaf::BPNode) = push!(so.working_leaves, leaf)
+Base.push!(so::Union{DepthFirst, BreadthFirst, ChangingOrder}, leaf::BPNode) = push!(so.working_leaves, leaf)

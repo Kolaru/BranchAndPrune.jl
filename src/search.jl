@@ -70,6 +70,32 @@ function SearchState(S, initial_region::REGION) where REGION
     return SearchState(S(root), root, 1)
 end
 
+regions(state::SearchState) = regions(state.tree)
+unfinished_regions(state::SearchState) = [leaf.region for leaf in state.search_order.working_leaves]
+finished_regions(state::SearchState) = finished_regions(state.tree)
+
+function Base.show(io::IO, state::SearchState{S, REGION}) where {S, REGION}
+    println(io, """
+    SearchState{$S, $REGION}
+      iteration: $(state.iteration)
+      $(length(unfinished_regions(state.tree))) regions being processed""")
+    for (i, region) in enumerate(unfinished_regions(state))
+        println(io, "    $region")
+
+        if i == 10
+            println("        ⋮")
+        end
+    end
+
+    println(io, "  $(length(finished_regions(state.tree))) finalized regions")
+    for (i, region) in enumerate(finished_regions(state))
+        println(io, "    $region")
+        if i == 10
+            println("        ⋮")
+        end
+    end
+end
+
 function Base.iterate(
         bp::BranchAndPruneSearch{S},
         state = SearchState(S, bp.initial_region)) where S
@@ -137,17 +163,14 @@ function BranchAndPruneResult(
         search_order,
         initial_region::REGION,
         tree::BPNode{REGION}) where REGION
-    
-    final_regions = REGION[leaf.region for leaf in Leaves(tree) if leaf.status == :final]
-    unfinished_regions = REGION[leaf.region for leaf in Leaves(tree) if leaf.status == :working]
 
     return BranchAndPruneResult(
         search_order,
         initial_region,
         tree,
-        final_regions,
-        unfinished_regions,
-        isempty(unfinished_regions)
+        finished_regions(tree),
+        unfinished_regions(tree),
+        isempty(unfinished_regions(tree))
     )
 end
 

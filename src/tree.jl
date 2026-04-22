@@ -27,7 +27,12 @@ function BPNode(status, region, parent, side)
     return node
 end
 
-Base.show(io::IO, ::MIME"text/plain", tree::BPNode) = print_tree(io, tree)
+function Base.show(io::IO, node::BPNode)
+    print(io, "BPNode($(node.status), $(node.region))")
+end
+
+Base.show(io::IO, ::MIME"text/plain", node::BPNode) = print_tree(io, node)
+
 function Base.getindex(node::BPNode, side::Symbol)
     side == :left && return node.left_child
     side == :right && return node.right_child
@@ -39,7 +44,6 @@ function Base.setindex!(node::BPNode, child::BPNode, side::Symbol)
     side == :right && return (node.right_child = child)
     throw(ArgumentError("BPNOde can only be indexed with :left or :right"))
 end
-
 
 """
     prune!(node::BPNOde ; squash = true)
@@ -88,6 +92,10 @@ function squash_node!(node::BPNode)
         child.parent = parent
     end
 end
+
+regions(tree::BPNode) = vcat(unfinished_regions(tree), finished_regions(tree))
+finished_regions(tree::BPNode{REGION}) where REGION = REGION[leaf.region for leaf in Leaves(tree) if leaf.status == :final]
+unfinished_regions(tree::BPNode{REGION}) where REGION = REGION[leaf.region for leaf in Leaves(tree) if leaf.status == :working]
 
 # AbstractTree.jl API
 function AbstractTrees.children(node::BPNode{REGION}) where REGION
